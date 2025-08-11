@@ -25,29 +25,33 @@ def daily_job(*args: Any, **kwargs: Any) -> None:
 
     Args can contain {"date": "YYYY-MM-DD"} for ad-hoc run.
     """
-    dt_str = kwargs.get("date")
-    dt = date.fromisoformat(dt_str) if dt_str else date.today()
+    dt_param = kwargs.get("date")
+    if isinstance(dt_param, date):
+        dt = dt_param
+    elif isinstance(dt_param, str) and dt_param:
+        dt = date.fromisoformat(dt_param)
+    else:
+        dt = date.today()
 
-    try:
-        for fetcher in (fetch_daily, fetch_adj_factor, fetch_daily_basic):
-            try:
-                result = fetcher(dt)
-            except Exception as e:  # record to fail_queue and continue other tables
-                enqueue_fail(endpoint=fetcher.__name__, params=json.dumps({"date": dt.isoformat()}), last_error=str(e))
-                continue
+    for fetcher in (fetch_daily, fetch_adj_factor, fetch_daily_basic):
+        try:
+            result = fetcher(dt)
+        except Exception as e:  # record to fail_queue and continue other tables
+            enqueue_fail(endpoint=fetcher.__name__, params=json.dumps({"date": dt.isoformat()}), last_error=str(e))
+            continue
 
-            if result.df.empty:
-                continue
+        if result.df.empty:
+            continue
 
-            part = PartitionPath(result.table, dt)
-            rows = write_parquet_atomic(result.df, part.tmp_file(), part.final_file())
+        part = PartitionPath(result.table, dt)
+        rows = write_parquet_atomic(result.df, part.tmp_file(), part.final_file())
 
-            # naive hash: sha1 of sorted ts_code
-            sha = hashlib.sha1()
-            if "ts_code" in result.df.columns:
-                codes = ",".join(sorted(result.df["ts_code"].astype(str).tolist()))
-                sha.update(codes.encode("utf-8"))
-            upsert_watermark(WatermarkRow(table=result.table, last_dt=dt, rowcount=rows, hash=sha.hexdigest()))
+        # naive hash: sha1 of sorted ts_code
+        sha = hashlib.sha1()
+        if "ts_code" in result.df.columns:
+            codes = ",".join(sorted(result.df["ts_code"].astype(str).tolist()))
+            sha.update(codes.encode("utf-8"))
+        upsert_watermark(WatermarkRow(table=result.table, last_dt=dt, rowcount=rows, hash=sha.hexdigest()))
 
 
 def get_jobs_status() -> list[dict[str, Any]]:
