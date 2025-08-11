@@ -11,6 +11,7 @@ from app.metrics.core import adjust_ohlc, compute_ma, compute_vol_ann
 import pandas as pd
 from .watchlist_store import get_watchlist as wl_get, set_watchlist as wl_set
 from .utils import normalize_ts_codes, compute_etag
+from app.datasource.sqlite_meta import list_jobs
 
 router = APIRouter()
 
@@ -32,7 +33,7 @@ def get_status() -> dict[str, list]:
         }
         for r in read_watermarks()
     ]
-    return {"watermarks": wms, "jobs": []}
+    return {"watermarks": wms, "jobs": list_jobs()}
 
 
 @router.get("/api/prices")

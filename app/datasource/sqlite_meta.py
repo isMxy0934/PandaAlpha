@@ -23,6 +23,16 @@ def _ensure_conn() -> sqlite3.Connection:
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS jobs (
+            id TEXT PRIMARY KEY,
+            last_run TIMESTAMP,
+            state TEXT,
+            next_run TIMESTAMP
+        )
+        """
+    )
     return conn
 
 
@@ -50,5 +60,23 @@ def list_fail(limit: int = 50) -> list[dict[str, Any]]:
         for r in cur.fetchall()
     ]
     return rows
+
+
+def upsert_job_status(job_id: str, last_run: str | None, state: str | None, next_run: str | None) -> None:
+    conn = _ensure_conn()
+    with conn:
+        conn.execute(
+            "INSERT INTO jobs(id,last_run,state,next_run) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET last_run=excluded.last_run, state=excluded.state, next_run=excluded.next_run",
+            (job_id, last_run, state, next_run),
+        )
+
+
+def list_jobs() -> list[dict[str, Any]]:
+    conn = _ensure_conn()
+    cur = conn.execute("SELECT id,last_run,state,next_run FROM jobs ORDER BY id")
+    return [
+        {"id": r[0], "last_run": r[1], "state": r[2], "next_run": r[3]}
+        for r in cur.fetchall()
+    ]
 
 
