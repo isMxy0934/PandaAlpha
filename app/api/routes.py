@@ -9,6 +9,7 @@ from app.datasource.watermark import read_watermarks
 from app.datasource.readers import read_prices_and_adj, read_daily_basic
 from app.metrics.core import adjust_ohlc, compute_ma, compute_vol_ann
 import pandas as pd
+from .watchlist_store import get_watchlist as wl_get, set_watchlist as wl_set
 
 router = APIRouter()
 
@@ -99,5 +100,19 @@ def get_metrics(
     out = out[cols]
     rows = out.to_dict(orient="records")
     return {"ts_code": ts_code, "rows": rows}
+
+
+@router.get("/api/watchlist")
+def list_watchlist(page: int = 1, limit: int = 50) -> dict:
+    return wl_get(page=page, limit=limit)
+
+
+@router.post("/api/watchlist")
+def update_watchlist(body: dict) -> dict:
+    codes = body.get("ts_codes", [])
+    if not isinstance(codes, list):
+        return {"error": {"code": "InvalidParam", "message": "ts_codes 必须为数组"}}
+    wl_set(codes)
+    return {"ok": True}
 
 

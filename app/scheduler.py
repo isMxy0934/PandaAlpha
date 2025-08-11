@@ -12,6 +12,7 @@ import hashlib
 import json
 
 import pandas as pd
+from dotenv import load_dotenv
 
 from app.adapters.tushare_adapter import fetch_daily, fetch_adj_factor, fetch_daily_basic
 from app.datasource.parquet_io import write_parquet_atomic
@@ -25,6 +26,9 @@ def daily_job(*args: Any, **kwargs: Any) -> None:
 
     Args can contain {"date": "YYYY-MM-DD"} for ad-hoc run.
     """
+    # ensure environment from .env is loaded when invoked as a script
+    load_dotenv(override=False)
+
     dt_param = kwargs.get("date")
     if isinstance(dt_param, date):
         dt = dt_param
