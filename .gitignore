@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+
+# Data artifacts (do not commit large/generated data)
+/data/**
+!data/.gitkeep
+
+# Parquet / Watermarks
+*.parquet
+
+# SQLite DBs
+*.sqlite
+
+# Node/Next
+web/node_modules/
+web/.next/
+web/.turbo/
+web/.vercel/
+
+# Env
+.env
