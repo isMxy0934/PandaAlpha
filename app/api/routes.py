@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.datasource.watermark import read_watermarks
 
 router = APIRouter()
 
@@ -11,7 +12,16 @@ def healthcheck() -> dict[str, bool]:
 
 @router.get("/api/status")
 def get_status() -> dict[str, list]:
-    # A-0: 返回空水位线与作业列表，占位
-    return {"watermarks": [], "jobs": []}
+    # 返回当前水位线与作业列表（作业留空直到接入 APScheduler）
+    wms = [
+        {
+            "table": r.table,
+            "last_dt": r.last_dt.isoformat(),
+            "rowcount": r.rowcount,
+            "hash": r.hash,
+        }
+        for r in read_watermarks()
+    ]
+    return {"watermarks": wms, "jobs": []}
 
 
