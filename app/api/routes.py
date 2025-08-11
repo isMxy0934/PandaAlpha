@@ -8,6 +8,7 @@ from fastapi import Query
 from app.datasource.watermark import read_watermarks
 from app.datasource.readers import read_prices_and_adj, read_daily_basic
 from app.metrics.core import adjust_ohlc, compute_ma, compute_vol_ann
+import pandas as pd
 
 router = APIRouter()
 

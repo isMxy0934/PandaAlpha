@@ -27,7 +27,12 @@ def read_prices_and_adj(
     start: Optional[date],
     end: Optional[date],
 ) -> pd.DataFrame:
-    prices_ds = _dataset("prices_daily")
+    try:
+        prices_ds = _dataset("prices_daily")
+    except FileNotFoundError:
+        return pd.DataFrame(columns=[
+            "ts_code","trade_date","open_raw","high_raw","low_raw","close_raw","pre_close","volume","amount","adj_factor"
+        ])
     filters = _filter_date_range(start, end)
     table = prices_ds.to_table(filter=filters, columns=[
         "ts_code","trade_date","open_raw","high_raw","low_raw","close_raw","pre_close","volume","amount"
