@@ -30,9 +30,6 @@ def write_parquet_atomic(df: pd.DataFrame, dest_tmp: Path, dest_final: Path) -> 
         use_dictionary=True,
         data_page_size=1024 * 1024,
         write_statistics=True,
-        # Bloom filter for ts_code when present
-        bloom_filter_enabled=True,
-        bloom_filter_columns=[c for c in df.columns if c == "ts_code"],
     )
 
     # Atomic rename
