@@ -3,13 +3,14 @@ from fastapi import APIRouter
 from datetime import date
 from typing import Optional
 
-from fastapi import Query
+from fastapi import Query, Response
 
 from app.datasource.watermark import read_watermarks
 from app.datasource.readers import read_prices_and_adj, read_daily_basic
 from app.metrics.core import adjust_ohlc, compute_ma, compute_vol_ann
 import pandas as pd
 from .watchlist_store import get_watchlist as wl_get, set_watchlist as wl_set
+from .utils import normalize_ts_codes, compute_etag
 
 router = APIRouter()
 
@@ -41,8 +42,9 @@ def get_prices(
     end: Optional[date] = None,
     adj: str = "backward",
     include_basic: bool = False,
+    response: Response = None,
 ) -> dict:
-    ts_codes = sorted({c.strip() for c in ts_code.split(",") if c.strip()})
+    ts_codes = normalize_ts_codes(ts_code)
     if not ts_codes:
         return {"error": {"code": "InvalidParam", "message": "ts_code 必填"}}
     if adj not in ("none", "forward", "backward"):
@@ -58,14 +60,37 @@ def get_prices(
         prices = prices.merge(basic, on=["ts_code", "trade_date"], how="left")
 
     prices = prices.sort_values(["ts_code", "trade_date"])  # ensure order
-    cols = ["ts_code","trade_date","open","high","low","close","volume","amount"]
-    if include_basic:
-        cols.append("turnover_rate")
-    rows = [
-        {**{k: (v.isoformat() if k == "trade_date" else (float(v) if pd.notna(v) else None)) for k, v in r.items()}}
-        for r in prices[cols].to_dict(orient="records")
-    ]
-    return {"adj": adj, "rows": rows}
+    def to_float(v):
+        return float(v) if pd.notna(v) else None
+    result_rows = []
+    for rec in prices.to_dict(orient="records"):
+        row = {
+            "ts_code": rec["ts_code"],
+            "trade_date": rec["trade_date"].isoformat() if rec.get("trade_date") else None,
+            "open": to_float(rec.get("open")),
+            "high": to_float(rec.get("high")),
+            "low": to_float(rec.get("low")),
+            "close": to_float(rec.get("close")),
+            "volume": int(rec["volume"]) if rec.get("volume") is not None and pd.notna(rec.get("volume")) else None,
+            "amount": to_float(rec.get("amount")),
+        }
+        if include_basic and "turnover_rate" in rec:
+            row["turnover_rate"] = to_float(rec.get("turnover_rate"))
+        result_rows.append(row)
+    resp = {"adj": adj, "rows": result_rows}
+    # Cache headers
+    etag = compute_etag({
+        "path": "/api/prices",
+        "ts_code": ts_codes,
+        "start": start.isoformat() if start else None,
+        "end": end.isoformat() if end else None,
+        "adj": adj,
+        "include_basic": include_basic,
+    })
+    if response is not None:
+        response.headers["ETag"] = etag
+        response.headers["Cache-Control"] = "max-age=300"
+    return resp
 
 
 @router.get("/api/metrics")
@@ -75,6 +100,7 @@ def get_metrics(
     metrics: str = "ma,vol_ann,turnover",
     start: Optional[date] = None,
     end: Optional[date] = None,
+    response: Response = None,
 ) -> dict:
     ts_code = ts_code.strip()
     if not ts_code:
@@ -99,7 +125,19 @@ def get_metrics(
     cols = [c for c in out.columns if c == "trade_date" or out[c].notna().any()]
     out = out[cols]
     rows = out.to_dict(orient="records")
-    return {"ts_code": ts_code, "rows": rows}
+    resp = {"ts_code": ts_code, "rows": rows}
+    etag = compute_etag({
+        "path": "/api/metrics",
+        "ts_code": ts_code,
+        "window": window,
+        "metrics": sorted(list(wanted)),
+        "start": start.isoformat() if start else None,
+        "end": end.isoformat() if end else None,
+    })
+    if response is not None:
+        response.headers["ETag"] = etag
+        response.headers["Cache-Control"] = "max-age=300"
+    return resp
 
 
 @router.get("/api/watchlist")

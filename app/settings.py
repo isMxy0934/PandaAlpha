@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AppSettings(BaseSettings):
@@ -9,10 +9,10 @@ class AppSettings(BaseSettings):
 
     tz: str = "Asia/Shanghai"
     database_url: str = "sqlite:///data/meta.sqlite"
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    tushare_token: str | None = None
+    serverchan_sendkey: str | None = None
+    data_provider: str = "akshare"  # akshare | tushare
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
 
 settings = AppSettings()

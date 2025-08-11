@@ -42,3 +42,12 @@ def set_watchlist(codes: list[str]) -> None:
         conn.execute("INSERT INTO watchlist(id, ts_codes) VALUES(1, ?) ON CONFLICT(id) DO UPDATE SET ts_codes=excluded.ts_codes", (dedup_sorted,))
 
 
+def list_all_codes() -> list[str]:
+    conn = _conn()
+    cur = conn.execute("SELECT ts_codes FROM watchlist WHERE id=1")
+    row = cur.fetchone()
+    if not row or not row[0]:
+        return []
+    return [c for c in row[0].split(",") if c]
+
+

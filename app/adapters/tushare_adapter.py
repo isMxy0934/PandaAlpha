@@ -35,6 +35,17 @@ def _ensure_ts() -> Any:
     return ts.pro_api()
 
 
+def fetch_trade_cal(start: date, end: date) -> pd.DataFrame:
+    pro = _ensure_ts()
+    df = pd.DataFrame(
+        pro.trade_cal(start_date=start.strftime("%Y%m%d"), end_date=end.strftime("%Y%m%d"), is_open="1")
+    )
+    if df.empty:
+        return df
+    df["cal_date"] = pd.to_datetime(df["cal_date"], format="%Y%m%d").dt.date
+    return df[["cal_date", "is_open"]]
+
+
 @retry(wait=wait_exponential(multiplier=0.5, min=0.5, max=8), stop=stop_after_attempt(5), reraise=True)
 def fetch_daily(trade_date: date) -> FetchResult:
     pro = _ensure_ts()
@@ -67,7 +78,11 @@ def fetch_daily(trade_date: date) -> FetchResult:
         }
     )
     df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d").dt.date
-    # TuShare vol is hands? Convert to shares if needed; keep as-is for now (spec says 股)
+    # TuShare: vol=手, amount=千元 → 转换到 规范：股 & 元
+    if "volume" in df.columns:
+        df["volume"] = (pd.to_numeric(df["volume"], errors="coerce").fillna(0) * 100).astype("int64")
+    if "amount" in df.columns:
+        df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0.0) * 1000.0
     return FetchResult("prices_daily", trade_date, df[[
         "ts_code","trade_date","open_raw","high_raw","low_raw","close_raw","pre_close","volume","amount"
     ]])

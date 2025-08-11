@@ -14,12 +14,13 @@ def _dataset(table: str) -> ds.Dataset:
 
 
 def _filter_date_range(start: Optional[date], end: Optional[date]):
-    filters = []
+    expr = None
     if start is not None:
-        filters.append(("trade_date", ">=", pd.Timestamp(start).date()))
+        expr = ds.field("trade_date") >= pd.Timestamp(start).date()
     if end is not None:
-        filters.append(("trade_date", "<=", pd.Timestamp(end).date()))
-    return filters if filters else None
+        end_expr = ds.field("trade_date") <= pd.Timestamp(end).date()
+        expr = end_expr if expr is None else (expr & end_expr)
+    return expr
 
 
 def read_prices_and_adj(
